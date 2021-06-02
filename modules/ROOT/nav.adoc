@@ -1,6 +1,3 @@
-* Quick starts
-** xref:quickstart-developers.adoc[Developers]
-** xref:quickstart-site-operations.adoc[Site operations engineers]
 * Installation
 ** xref:installation-local.adoc[Local K8s]
 *** xref:quickstart-helm-installs.adoc[Old instructions]
@@ -9,6 +6,9 @@
 *** xref:installation-eks.adoc[EKS]
 *** xref:installation-gke.adoc[GKE]
 ** xref:quickstart-server-installs.adoc[Bare metal]
+* Quick starts
+** xref:quickstart-developers.adoc[Developers]
+** xref:quickstart-site-operations.adoc[Site operations engineers]
 * Operations
 ** xref:ops-securing.adoc[Securing]
 ** xref:ops-troubleshooting.adoc[Troubleshooting]
