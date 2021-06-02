@@ -1,0 +1,499 @@
+= Google Kubernetes Engine
+
+https://cloud.google.com/kubernetes-engine[Google Kubernetes Engine] or "GKE" is a managed Kubernetes environment on the https://cloud.google.com/[Google Cloud Platform] (GCP).
+GKE is a fully managed experience;
+it handles the management/upgrading of the Kubernetes cluster master as well as autoscaling of "nodes" through "node pool" templates.
+
+Through GKE, your Kubernetes deployments will have first-class support for GCP IAM identities, built-in configuration of high-availability and secured clusters, as well as native access to GCP's networking features such as load balancers.
+
+TIP: Also available in followup topics are post-install steps and role-based considerations for [developers]({{< relref "/quickstarts/developer">}}) or [Site Reliability Engineers]({{< relref "/quickstarts/site-reliability-engineer">}}) (SREs).
+
+
+== Deployment
+
+This topic covers provisioning the following infrastructure resources.
+
+* 1x Google Compute Network (Virtual Private Cloud, or VPC)
+* 1x Subnet
+* 1x Router
+* 1x Compute Router NAT
+* 1x _Regional_ GKE cluster with instances spread across multiple Availability Zones.
+* 1x Node Pool
+ ** 6x Kubernetes workers
+  *** 8 vCPUs
+  *** 64 GB RAM
+* 2x Load Balancers
+* 3x 2TB PD-SSD Volumes (provisioned automatically during installation of K8ssandra)
+* 1x Google Cloud Storage bucket for backups
+* 1x Google Storage Bucket IAM member
+
+On this infrastructure the K8ssandra installation will consist of the following workloads.
+
+* 3x instance Apache Cassandra cluster
+* 3x instance Stargate deployment
+* 1x instance Prometheus deployment
+* 1x instance Grafana deployment
+* 1x instance Reaper deployment
+
+Feel free to update the parameters used during this guide to match your target deployment.
+This should be considered a minimum for production workloads.
+
+NOTE: This installation slightly exceeds the default quotas provided within a new project.
+Consider requesting the following quota requests to allow for the provisioning of this installation.
++
+* 6x Backend services 
+
+== Terraform
+
+As a convenience we provide reference https://www.terraform.io/[Terraform] modules for orchestrating the provisioning of cloud resources necessary to run K8ssandra.
+
+=== Tools
+
+|===
+| Tool | Version
+
+| https://www.terraform.io/downloads.html[Terraform]
+| 0.14
+
+| https://registry.terraform.io/providers/hashicorp/google/latest[Terraform GCP provider]
+| ~>3.0
+
+| https://helm.sh/[Helm]
+| 3
+
+| https://cloud.google.com/sdk[Google Cloud SDK]
+| 333.0.0
+
+| - bq
+| 2.0.65
+
+| - core
+| 2021.03.19
+
+| - gsutil
+| 4.60
+
+| https://kubernetes.io/docs/tasks/tools/[kubectl]
+| 1.17.17
+|===
+
+=== Checkout the `k8ssandra-terraform` project
+
+Each of our reference deployment may be found in the GitHub https://github.com/k8ssandra/k8ssandra-terraform[k8ssandra/k8ssandra-terraform] project.
+Download the latest release or current `main` branch locally.
+
+[source,bash]
+----
+git clone git@github.com:k8ssandra/k8ssandra-terraform.git
+----
+
+*Output*:
+
+[source,bash]
+----
+Cloning into 'k8ssandra-terraform'...
+remote: Enumerating objects: 273, done.
+remote: Counting objects: 100% (273/273), done.
+remote: Compressing objects: 100% (153/153), done.
+remote: Total 273 (delta 145), reused 233 (delta 112), pack-reused 0
+Receiving objects: 100% (273/273), 71.29 KiB | 1.30 MiB/s, done.
+Resolving deltas: 100% (145/145), done.
+----
+
+[source,bash]
+----
+cd k8ssandra-terraform/gcp
+----
+
+=== Configure `gcloud` CLI
+
+Ensure you have authenticated your `gcloud` client by running the following command:
+
+[source,console]
+----
+gcloud auth login
+----
+
+*Output*:
+
+[source,console]
+----
+Your browser has been opened to visit:
+
+    https://accounts.google.com/.....
+
+You are now logged in as [kate.sandra@k8ssandra.io].
+Your current project is [k8ssandra-demo].  You can change this setting by running:
+  $ gcloud config set project PROJECT_ID
+----
+
+Next configure the `region`, `zone`, and `project name` configuration parameters.
+
+Set the region:
+
+[source,console]
+----
+gcloud config set compute/region us-central1
+----
+
+*Output*:
+
+[source,console]
+----
+Updated property [compute/region].
+----
+
+Set the zone:
+
+[source,console]
+----
+gcloud config set compute/zone us-central1-c
+----
+
+*Output*:
+
+[source,console]
+----
+Updated property [compute/zone].
+----
+
+Set the project:
+
+[source,console]
+----
+gcloud config set project "k8ssandra-testing"
+----
+
+*Output*:
+
+[source,console]
+----
+Updated property [core/project].
+----
+
+=== Setup Environment Variables
+
+These values will be used to define where infrastructure is provisioned along with the naming of resources.
+
+[source,bash]
+----
+export TF_VAR_environment=prod
+export TF_VAR_name=k8ssandra
+export TF_VAR_project_id=k8ssandra-testing
+export TF_VAR_region=us-central1
+----
+
+NOTE: GCP limits the total length of resource names.
+If your deployment fails to plan try reducing the number of characters in the `environment` and `name` parameters.
+
+
+=== Provision Infrastructure
+
+We begin this process by initializing our environment and configuring a workspace.
+To start we run `terraform init` which handles pulling down any plugins required and configures the backend.
+
+[source,bash]
+----
+cd env
+terraform init
+----
+
+*Output*:
+
+[source,bash]
+----
+Initializing modules...
+
+Initializing the backend...
+
+Initializing provider plugins...
+- Finding hashicorp/google versions matching "~> 3.0"...
+- Finding latest version of hashicorp/google-beta...
+- Installing hashicorp/google v3.65.0...
+- Installed hashicorp/google v3.65.0 (signed by HashiCorp)
+- Installing hashicorp/google-beta v3.65.0...
+- Installed hashicorp/google-beta v3.65.0 (signed by HashiCorp)
+
+# Output reduced for brevity
+
+Terraform has been successfully initialized!
+----
+
+With the workspace configured we now instruct terraform to `plan` the required changes to our infrastructure (in this case creation).
+
+[source,console]
+----
+terraform plan
+----
+
+*Output*:
+
+[source,bash]
+----
+Acquiring state lock. This may take a few moments...
+
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+# Output reduced for brevity
+
+Plan: 26 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + bucket_name     = "prod-k8ssandra-storage-bucket"
+  + endpoint        = (known after apply)
+  + master_version  = (known after apply)
+  + service_account = (known after apply)
+----
+
+After planning we tell terraform to `apply` the plan.
+This command kicks off the actual provisioning of resources for this deployment.
+
+[source,console]
+----
+terraform apply
+----
+
+*Output*:
+
+[source,bash]
+----
+# Output reduced for brevity
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+# Output reduced for brevity
+
+Apply complete! Resources: 26 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+bucket_name = "prod-k8ssandra-storage-bucket"
+endpoint = "......"
+master_version = "1.18.16-gke.502"
+service_account = "prod-k8ssandra-sa@k8ssandra-testing.iam.gserviceaccount.com"
+----
+
+With the GKE cluster deployed you may now continue with <<retrieve-kubeconfig,retrieving the kubeconfig>>.
+
+== Retrieve `kubeconfig`
+
+After provisioning the GKE cluster we must request a copy of the `kubeconfig`.
+This provides the `kubectl` command with all connection information including TLS certificates and IP addresses for Kube API requests.
+
+[source,console]
+----
+gcloud container clusters get-credentials prod-k8ssandra --region us-central1 --project k8ssandra-testing
+----
+
+*Output*:
+
+[source,bash]
+----
+Fetching cluster endpoint and auth data.
+kubeconfig entry generated for prod-k8ssandra.
+----
+
+[source,bash]
+----
+kubectl cluster-info
+----
+
+*Output*:
+
+[source,bash]
+----
+Kubernetes control plane is running at https://.....
+GLBCDefaultBackend is running at https://...../api/v1/namespaces/kube-system/services/default-http-backend:http/proxy
+KubeDNS is running at https://...../api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+Metrics-server is running at https://...../api/v1/namespaces/kube-system/services/https:metrics-server:/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+----
+
+[source,bash]
+----
+kubectl version
+----
+
+*Output*:
+
+[source,bash]
+----
+Client Version: version.Info{Major:"1", Minor:"21", GitVersion:"v1.21.0", GitCommit:"cb303e613a121a29364f75cc67d3d580833a7479", GitTreeState:"clean", BuildDate:"2021-04-08T16:31:21Z", GoVersion:"go1.16.1", Compiler:"gc", Platform:"linux/amd64"}
+Server Version: version.Info{Major:"1", Minor:"18+", GitVersion:"v1.18.16-gke.502", GitCommit:"a2a88ab32201dca596d0cdb116bbba3f765ebd36", GitTreeState:"clean", BuildDate:"2021-03-08T22:06:24Z", GoVersion:"go1.13.15b4", Compiler:"gc", Platform:"linux/amd64"}
+WARNING: version difference between client (1.21) and server (1.18) exceeds the supported minor version skew of +/-1
+----
+
+== Install K8ssandra
+
+With all of the infrastructure provisioned we can now focus on installing K8ssandra.
+This will require configuring a service account for the backup and restore service, creating a set of Helm variable overrides, and setting up GKE specific ingress configurations.
+
+=== Create Backup / Restore Service Account Secrets
+
+In order to allow for backup and restore operations, we must create a service account for the Medusa operator which handles coordinating the movement of data to and from Google Cloud Storage (GCS) buckets.
+As part of the provisioning sections a service account was generated for this purposes.
+Here we will retrieve the authentication JSON file for this account and push it into Kubernetes as a secret.
+
+Looking at the output of `terraform plan` and `terraform apply` we can see the name of the service account which has been provisioned.
+Here we use `terraform output` to retrieve keys for use by Medusa.
+In our reference implementation this value is `prod-k8ssandra-sa@k8ssandra-testing.iam.gserviceaccount.com`.
+
+[source,console]
+----
+terraform output -json service_account_key > medusa_gcp_key.json
+----
+
+With the key file on our local machine we can now push this file to Kubernetes as a secret with `kubectl`.
+
+[source,bash]
+----
+kubectl create secret generic prod-k8ssandra-medusa-key --from-file=medusa_gcp_key.json=./medusa_gcp_key.json
+----
+
+*Output*:
+
+[source,bash]
+----
+secret/prod-k8ssandra-medusa-key created
+----
+
+IMPORTANT: The name of the JSON key file within the secret MUST be `medusa_gcp_key.json`.
+_Any_ other value will result in Medusa not finding the secret and backups failing.
+
+
+This secret, `prod-k8ssandra-medusa-key`, can now be referenced in our K8ssandra configuration to allow for backing up data to GCS with Medusa.
+
+=== Generate `gke.values.yaml`
+
+Here is a reference Helm `values.yaml` file with configuration options for running K8ssandra in GKE.
+
+{{< readfilerel file="gke.values.yaml"  highlight="yaml" >}}
+
+IMPORTANT: Take note of the comments in this file.
+If you have changed the name of your secret, are deploying in a different region, or have tweaked any other values it is imperative that you update this file before proceeding.
+
+
+=== Deploy K8ssandra with Helm
+
+With a `values.yaml` file generated which details out specific configuration overrides we can now deploy K8ssandra via Helm.
+
+[source,bash]
+----
+helm install prod-k8ssandra k8ssandra/k8ssandra -f gke.values.yaml
+----
+
+*Output*:
+
+[source,bash]
+----
+NAME: prod-k8ssandra
+LAST DEPLOYED: Sat Apr 24 01:15:46 2021
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+----
+
+[#superuser]
+=== Retrieve K8ssandra superuser credentials
+
+You'll need the K8ssandra superuser name and password in order to access Cassandra utilities and do things like generate a Stargate access token.
+
+TIP: In `kubectl get secret` commands, be sure to prepend the environment name.
+In this topic's examples, we have used `prod-k8ssandra`.
+Notice how it's prepended in the examples below.
+Also, save the displayed superuser name and the generated password for your environment.
+You will need the credentials when following the  [Quickstart for developers]({{< relref "/quickstarts/developer" >}}) or [Quickstart for Site Reliability Engineers]({{< relref "/quickstarts/site-reliability-engineer" >}}) post-install steps.
+
+
+To retrieve K8ssandra superuser credentials:
+
+. Retrieve the K8ssandra superuser name:
++
+[source,bash]
+----
+ kubectl get secret prod-k8ssandra-superuser -o jsonpath="{.data.username}" | base64 --decode ; echo
+----
++
+*Output*:
++
+[source,bash]
+----
+ prod-k8ssandra-superuser
+----
+
+. Retrieve the K8ssandra superuser password:
++
+[source,bash]
+----
+ kubectl get secret prod-k8ssandra-superuser -o jsonpath="{.data.password}" | base64 --decode ; echo
+----
++
+*Output*:
++
+[source,bash]
+----
+ PGo8kROUgAJOa8vhjQrE49Lgruw7s32HCPyVvcfVmmACW8oUhfoO9A
+----
+
+== Cleanup Resources
+
+If this cluster is no longer needed you may optionally uninstall K8ssandra or delete all of the infrastructure.
+
+=== Uninstall K8ssandra
+
+[source,console]
+----
+helm uninstall prod-k8ssandra
+----
+
+*Output*:
+
+[source,bash]
+----
+release "prod-k8ssandra" uninstalled
+----
+
+=== Destroy GKE Cluster
+
+[source,console]
+----
+terraform destroy
+----
+
+*Output*:
+
+[source,bash]
+----
+# Output omitted for brevity
+
+Plan: 0 to add, 0 to change, 26 to destroy.
+
+Changes to Outputs:
+  - bucket_name    = "prod-k8ssandra-storage-bucket" -> null
+  - endpoint       = "....." -> null
+  - master_version = "1.18.16-gke.502" -> null
+
+Do you really want to destroy all resources in workspace "my-workspace"?
+  Terraform will destroy all your managed infrastructure, as shown above.
+  There is no undo. Only 'yes' will be accepted to confirm.
+
+  Enter a value: yes
+
+# Output omitted for brevity
+
+Destroy complete! Resources: 26 destroyed.
+----
+
+== Next steps
+
+With a freshly provisioned cluster on GKE, consider visiting the [developer]({{< relref "/quickstarts/developer" >}}) and [Site Reliability Engineer]({{< relref "/quickstarts/site-reliability-engineer" >}}) quickstarts for a guided experience exploring your cluster.
+
+Alternatively, if you want to tear down your GKE cluster and / or infrastructure, refer to the section above that covers [cleaning up resources]({{< relref "#cleanup-resources" >}}).

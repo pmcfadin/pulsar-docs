@@ -1,5 +1,19 @@
-* xref:faqs.adoc[]
-* xref:quickstart-helm-installs.adoc[]
-* xref:quickstart-server-installs.adoc[]
-* xref:admin-console-tutorial.adoc[]
-* xref:pulsar-monitor.adoc[]
+* Quick starts
+** xref:quickstart-developers.adoc[Developers]
+** xref:quickstart-site-operations.adoc[Site operations engineers]
+* Installation
+** xref:installation-local.adoc[Local K8s]
+*** xref:quickstart-helm-installs.adoc[Old instructions]
+** Cloud K8s
+*** xref:installation-aks.adoc[AKS]
+*** xref:installation-eks.adoc[EKS]
+*** xref:installation-gke.adoc[GKE]
+** xref:quickstart-server-installs.adoc[Bare metal]
+* xref:ops-securing.adoc[Securing]
+* xref:ops-troubleshooting.adoc[Troubleshooting]
+* xref:pulsar-monitor.adoc[Monitoring]
+* xref:ops-upgrading.adoc[Upgrading]
+* xref:ops-scaling.adoc[Scaling]
+* xref:admin-console-tutorial.adoc[Admin console]
+* xref:faqs.adoc[FAQs]
+* Release notes

@@ -1,0 +1,420 @@
+= Azure Kubernetes Service
+
+https://azure.microsoft.com/en-us/services/kubernetes-service/[Azure Elastic Kubernetes Service] or "AKS" is a managed Kubernetes service that makes it easy for you to run Kubernetes on Azure.
+AKS offers serverless Kubernetes, an integrated continuous integration and continuous delivery (CI/CD) experience, and enterprise-grade security and governance.
+
+TIP: Also available in followup topics are post-install steps and role-based considerations for [developers]({{< relref "/quickstarts/developer">}}) or [site reliability engineers]({{< relref "/quickstarts/site-reliability-engineer">}}) (SREs).
+
+
+Note that at this time backup and restore support for Azure Blob Storage is still in progress.
+Follow https://github.com/k8ssandra/k8ssandra/issues/685[k8ssandra#685] for progress in this area.
+
+== Deployment
+
+This topic covers provisioning and installing the following infrastructure resources.
+
+* AKS cluster
+* AKS default node pool
+* Managed Identity
+* Storage Account
+* Storage container
+* Virtual Network(Vnet)
+* Subnets
+* Network Security Group
+* NAT Gateway
+* Public IP
+* Route Table
+* Route Table association
+
+On this infrastructure the K8ssandra installation will consist of the following workloads.
+
+* 3x instance Apache Cassandra cluster
+* 3x instance Stargate deployment
+* 1x instance Prometheus deployment
+* 1x instance Grafana deployment
+* 1x instance Reaper deployment
+
+Feel free to update the parameters used during this guide to match your target deployment.
+This should be considered a minimum for production workloads.
+
+TIP: If you already have an AKS cluster provisioned skip to the <<install-k8ssandra,installation procedures>>.
+
+
+== Terraform
+
+As a convenience we provide reference https://www.terraform.io/[Terraform] modules for orchestrating the provisioning of cloud resources necessary to run K8ssandra.
+
+=== Tools
+
+|===
+| Tool | Version
+
+| https://www.terraform.io/downloads.html[Terraform]
+| 0.14
+
+| https://registry.terraform.io/providers/hashicorp/azurerm/latest[Azurerm provider]
+| ~>3.0
+
+| https://helm.sh/[Helm]
+| 3
+
+| https://docs.microsoft.com/en-us/cli/azure/install-azure-cli[AZ CLI]
+| 2.22.1
+
+| https://kubernetes.io/docs/tasks/tools/[kubectl]
+| 1.17.17
+
+| https://www.python.org/downloads/[Python]
+| 3
+|===
+
+=== Checkout the `k8ssandra-terraform` project
+
+Each of our reference deployment may be found in the GitHub https://github.com/k8ssandra/k8ssandra-terraform[k8ssandra/k8ssandra-terraform] project.
+Download the latest release or current `main` branch locally.
+
+[source,bash]
+----
+git clone git@github.com:k8ssandra/k8ssandra-terraform.git
+----
+
+*Output*:
+
+[source,bash]
+----
+Cloning into 'k8ssandra-terraform'...
+remote: Enumerating objects: 273, done.
+remote: Counting objects: 100% (273/273), done.
+remote: Compressing objects: 100% (153/153), done.
+remote: Total 273 (delta 145), reused 233 (delta 112), pack-reused 0
+Receiving objects: 100% (273/273), 71.29 KiB | 1.30 MiB/s, done.
+Resolving deltas: 100% (145/145), done.
+----
+
+[source,bash]
+----
+cd k8ssandra-terraform/azure
+----
+
+=== Configure `az` CLI
+
+Ensure you have authenticated your `az` client by running the following command:
+
+[source,console]
+----
+az login
+----
+
+*Output*:
+
+[source,console]
+----
+The default web browser has been opened at https://login.microsoftonline.com/common/oauth2/authorize. Please continue the login in the web browser. If no web browser is available or if the web browser fails to open, use device code flow with `az login --use-device-code`.
+You have logged in. Now let us find all the subscriptions to which you have access...
+[
+  {
+    "cloudName": "AzureCloud",
+    "homeTenantId":  "00000000-0000-0000-0000-000000000000",
+    "id": "00000000-0000-0000-0000-000000000000",
+    "isDefault": true,
+    "managedByTenants": [],
+    "name": "k8ssandra",
+    "state": "Enabled",
+    "tenantId": "00000000-0000-0000-0000-000000000000",
+    "user": {
+      "name": "kate.sandra@k8ssandra.io",
+      "type": "user"
+    }
+  }
+]
+----
+
+=== Setup Environment Variables
+
+These values will be used to define where infrastructure is provisioned along with the naming of resources.
+
+[source,bash]
+----
+export TF_VAR_environment=prod
+export TF_VAR_name=k8ssandra
+export TF_VAR_region=eastus
+----
+
+=== Provision Infrastructure
+
+We begin this process by initializing our environment.
+To start we run `terraform init` which handles pulling down any plugins required and configures the backend.
+
+[source,console]
+----
+cd env
+terraform init
+----
+
+*Output*:
+
+[source,console]
+----
+Initializing modules...
+- aks in ../modules/aks
+- iam in ../modules/iam
+- storage in ../modules/storage
+- vnet in ../modules/vnet
+
+Initializing the backend...
+
+Initializing provider plugins...
+- Reusing previous version of hashicorp/azurerm from the dependency lock file
+- Installing hashicorp/azurerm v2.49.0...
+- Installed hashicorp/azurerm v2.49.0 (self-signed, key ID 34365D9472D7468F)
+
+# Output reduced for brevity
+
+Terraform has been successfully initialized!
+----
+
+With the workspace configured we now instruct terraform to `plan` the required changes to our infrastructure (in this case creation).
+
+[source,console]
+----
+terraform plan
+----
+
+*Output*:
+
+[source,console]
+----
+Terraform used the selected providers to generate the following execution plan. Resource actions
+are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+# Output reduced for brevity
+
+Plan: 21 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + aks_fqdn           = (known after apply)
+  + aks_id             = (known after apply)
+  + connect_cluster    = "az aks get-credentials --resource-group prod-k8ssandra-resource-group --name prod-k8ssandra-aks-cluster"
+  + resource_group     = "prod-k8ssandra-resource-group"
+  + storage_account_id = (known after apply)
+----
+
+After planning we tell terraform to `apply` the plan.
+This command kicks off the actual provisioning of resources for this deployment.
+
+[source,console]
+----
+terraform apply
+----
+
+*Output*:
+
+[source,bash]
+----
+# Output reduced for brevity
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+# Output reduced for brevity
+
+Apply complete! Resources: 21 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+aks_fqdn = "prod-k8ssandra-00000000.hcp.eastus.azmk8s.io"
+aks_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/prod-k8ssandra-resource-group/providers/Microsoft.ContainerService/managedClusters/prod-k8ssandra-aks-cluster"
+connect_cluster = "az aks get-credentials --resource-group prod-k8ssandra-resource-group --name prod-k8ssandra-aks-cluster"
+resource_group = "prod-k8ssandra-resource-group"
+storage_account_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/prod-k8ssandra-resource-group/providers/Microsoft.Storage/storageAccounts/prodk8ssandrastorage"
+----
+
+With the AKS cluster deployed you may now continue with <<retrieve-kubeconfig,retrieving the kubeconfig>>.
+
+== Retrieve `kubeconfig`
+
+After provisioning the AKS cluster we must request a copy of the `kubeconfig`.
+This provides the `kubectl` command with all connection information including TLS certificates and IP addresses for Kube API requests.
+
+[source,console]
+----
+az aks get-credentials --resource-group prod-k8ssandra-resource-group --name prod-k8ssandra-aks-cluster
+----
+
+*Output*:
+
+[source,bash]
+----
+Merged "prod-k8ssandra-aks-cluster" as current context in /home/bradfordcp/.kube/config
+----
+
+[source,bash]
+----
+kubectl cluster-info
+----
+
+*Output*:
+
+[source,bash]
+----
+Kubernetes control plane is running at https://prod-k8ssandra-00000000.hcp.eastus.azmk8s.io:443
+CoreDNS is running at https://prod-k8ssandra-00000000.hcp.eastus.azmk8s.io:443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+Metrics-server is running at https://prod-k8ssandra-00000000.hcp.eastus.azmk8s.io:443/api/v1/namespaces/kube-system/services/https:metrics-server:/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+----
+
+[source,bash]
+----
+kubectl version
+----
+
+*Output*:
+
+[source,bash]
+----
+Client Version: version.Info{Major:"1", Minor:"21", GitVersion:"v1.21.1", GitCommit:"5e58841cce77d4bc13713ad2b91fa0d961e69192", GitTreeState:"clean", BuildDate:"2021-05-12T14:18:45Z", GoVersion:"go1.16.4", Compiler:"gc", Platform:"linux/amd64"}
+Server Version: version.Info{Major:"1", Minor:"19", GitVersion:"v1.19.9", GitCommit:"6c90dbd9d6bb1ae8a4c0b0778752be06873e7c55", GitTreeState:"clean", BuildDate:"2021-03-22T23:02:49Z", GoVersion:"go1.15.8", Compiler:"gc", Platform:"linux/amd64"}
+WARNING: version difference between client (1.21) and server (1.19) exceeds the supported minor version skew of +/-1
+----
+
+== Install K8ssandra
+
+With all of the infrastructure provisioned we can now focus on installing K8ssandra.
+This will require configuring a service account for the backup and restore service, creating a set of Helm variable overrides, and setting up AKS specific ingress configurations.
+
+=== Generate `aks.values.yaml`
+
+Here is a reference Helm `values.yaml` file with configuration options for running K8ssandra in AKS.
+
+{{< readfilerel file="aks.values.yaml"  highlight="yaml" >}}
+
+IMPORTANT: Take note of the comments in this file.
+If you have changed the name of your secret, are deploying in a different region, or have tweaked any other values it is imperative that you update this file before proceeding.
+
+
+=== Deploy K8ssandra with Helm
+
+With a `values.yaml` file generated which details out specific configuration overrides we can now deploy K8ssandra via Helm.
+
+[source,bash]
+----
+helm install prod-k8ssandra k8ssandra/k8ssandra -f aks.values.yaml
+----
+
+*Output*:
+
+[source,bash]
+----
+NAME: prod-k8ssandra
+LAST DEPLOYED: Fri May 21 16:17:33 2021
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+----
+
+[#superuser]
+=== Retrieve K8ssandra superuser credentials
+
+You'll need the K8ssandra superuser name and password in order to access Cassandra utilities and do things like generate a Stargate access token.
+
+TIP: In `kubectl get secret` commands, be sure to prepend the environment name.
+In this topic's examples, we have used `prod-k8ssandra`.
+Notice how it's prepended in the examples below.
+Also, save the displayed superuser name and the generated password for your environment.
+You will need the credentials when following the  [Quickstart for developers]({{< relref "/quickstarts/developer" >}}) or [Quickstart for Site Reliability Engineers]({{< relref "/quickstarts/site-reliability-engineer" >}}) post-install steps.
+
+
+To retrieve K8ssandra superuser credentials:
+
+. Retrieve the K8ssandra superuser name:
++
+[source,bash]
+----
+ kubectl get secret prod-k8ssandra-superuser -o jsonpath="{.data.username}" | base64 --decode ; echo
+----
++
+*Output*:
++
+[source,bash]
+----
+ prod-k8ssandra-superuser
+----
+
+. Retrieve the K8ssandra superuser password:
++
+[source,bash]
+----
+ kubectl get secret prod-k8ssandra-superuser -o jsonpath="{.data.password}" | base64 --decode ; echo
+----
++
+*Output*:
++
+[source,bash]
+----
+ o4NlBIWcO2KzKuBPU9mB
+----
+
+== Cleanup Resources
+
+If this cluster is no longer needed you may optionally uninstall K8ssandra or delete all of the infrastructure.
+
+=== Uninstall K8ssandra
+
+[source,console]
+----
+helm uninstall prod-k8ssandra
+----
+
+*Output*:
+
+[source,bash]
+----
+release "prod-k8ssandra" uninstalled
+----
+
+=== Destroy AKS Cluster
+
+[source,console]
+----
+terraform destroy
+----
+
+*Output*:
+
+[source,bash]
+----
+# Output omitted for brevity
+
+Plan: 0 to add, 0 to change, 21 to destroy.
+
+Changes to Outputs:
+  - aks_fqdn           = "prod-k8ssandra-0000000.hcp.eastus.azmk8s.io" -> null
+  - aks_id             = "/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/prod-k8ssandra-resource-group/providers/Microsoft.ContainerService/managedClusters/prod-k8ssandra-aks-cluster" -> null
+  - connect_cluster    = "az aks get-credentials --resource-group prod-k8ssandra-resource-group --name prod-k8ssandra-aks-cluster" -> null
+  - resource_group     = "prod-k8ssandra-resource-group" -> null
+  - storage_account_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/prod-k8ssandra-resource-group/providers/Microsoft.Storage/storageAccounts/prodk8ssandrastorage" -> null
+
+Do you really want to destroy all resources?
+  Terraform will destroy all your managed infrastructure, as shown above.
+  There is no undo. Only 'yes' will be accepted to confirm.
+
+  Enter a value: yes
+
+
+# Output omitted for brevity
+
+Destroy complete! Resources: 21 destroyed.
+----
+
+== Next steps
+
+With a freshly provisioned cluster on AKS, consider visiting the [developer]({{< relref "/quickstarts/developer" >}}) and [Site Reliability Engineer]({{< relref "/quickstarts/site-reliability-engineer" >}}) quickstarts for a guided experience exploring your cluster.
+
+Alternatively, if you want to tear down your AKS cluster and / or infrastructure, refer to the section above that covers [cleaning up resources]({{< relref "#cleanup-resources" >}}).
