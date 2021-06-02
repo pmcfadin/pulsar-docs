@@ -9,11 +9,12 @@
 *** xref:installation-eks.adoc[EKS]
 *** xref:installation-gke.adoc[GKE]
 ** xref:quickstart-server-installs.adoc[Bare metal]
-* xref:ops-securing.adoc[Securing]
-* xref:ops-troubleshooting.adoc[Troubleshooting]
-* xref:pulsar-monitor.adoc[Monitoring]
-* xref:ops-upgrading.adoc[Upgrading]
-* xref:ops-scaling.adoc[Scaling]
+* Operations
+** xref:ops-securing.adoc[Securing]
+** xref:ops-troubleshooting.adoc[Troubleshooting]
+** xref:pulsar-monitor.adoc[Monitoring]
+** xref:ops-upgrading.adoc[Upgrading]
+** xref:ops-scaling.adoc[Scaling]
 * xref:admin-console-tutorial.adoc[Admin console]
 * xref:faqs.adoc[FAQs]
 * Release notes
