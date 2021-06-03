@@ -1,0 +1,413 @@
+= Overview
+
+In this project we will configure a georeplicated pulsar cluster on Azure.
+To Run this we will have to set up 2 AKS clusters which consists of two Pulsar Clusters and one Zookeeper Cluster.
+
+image::Pulsar_Data_Flow_Diagrams.png[namespaces]
+
+Table of Contents:
+
+* <<setting-up-aks,Setting up AKS>>
+* <<create-the-resource-group,Create the Resource Group>>
+ ** <<primary-location,Primary Location>>
+ ** <<second-cluster-location,Second CLuster Location>>
+* <<create-global-zookeeper-cluster,Create Global Zookeeper Cluster>>
+ ** <<connect-to-the-cluster,Connect to the Cluster>>
+ ** <<-optional--set-the-kubectl-namespace,(optional) set the kubectl namespace>>
+ ** <<install-the-helm-charts,Install the Helm Charts>>
+ ** <<deploy-the-zookeeper-operator,Deploy the zookeeper operator>>
+ ** <<expose-the-zookeeper-service-with-this-yaml-file-or-copy-and-paste-the-below,Expose the zookeeper service with this yaml file or copy and paste the below>>
+ ** <<test-that-zookeeper-is-up-and-running,Test that Zookeeper is up and running>>
+* <<create-pulsar-clusters,Create Pulsar Clusters>>
+ ** <<region-one-pulsar-cluster---east-us,Region One Pulsar Cluster - East US>>
+ ** <<region-two-pulsar-cluster---east-us-2,Region Two Pulsar Cluster - East US 2>>
+* <<configuring-the-multi-region-clusters,Configuring the Multi-Region Clusters>>
+* <<trouble-shooting,Trouble Shooting>>
+
+== Setting up AKS
+
+== Create the Resource Group
+
+[discrete]
+==== Primary Location
+
+----
+az group create --name pulsar-cluster-poc --location eastus
+----
+
+[discrete]
+==== Second CLuster Location
+
+----
+az group create --name pulsar-cluster-poc-west --location westus
+----
+
+== Create Global Zookeeper Cluster
+
+----
+az aks create --resource-group pulsar-cluster-poc --name pulsar-cluster-poc-global-zookeeper --node-count 3 --generate-ssh-keys
+----
+
+=== Connect to the Cluster
+
+----
+az login
+az aks get-credentials --name pulsar-cluster-poc-global-zookeeper -g pulsar-cluster-poc
+----
+
+If all goes well you should see the following
+
+** Merged "pulsar-cluster-poc-global-zookeeper" as current context in /Users/zekedean/.kube/config **
+
+=== (optional) set the kubectl namespace
+
+----
+kubectl create namespace global-zookeeper
+kubectl config set-context $(kubectl config current-context) --namespace=global-zookeeper
+----
+
+=== Install the Helm Charts
+
+https://github.com/pravega/zookeeper-operator[If you have a chance definitely read up on this helm chart it is very nice]
+
+----
+helm repo add pravega https://charts.pravega.io
+helm repo update
+----
+
+=== Deploy the zookeeper operator
+
+----
+helm install zookeeper-operator pravega/zookeeper-operator
+helm install zookeeper pravega/zookeeper
+----
+
+=== Expose the zookeeper service with this yaml file or copy and paste the below
+
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-zookeeper-client-svc
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 2181
+  selector:
+    app: zookeeper
+----
+
+=== Test that Zookeeper is up and running
+
+Run the following command to get the external-ip address
+
+----
+kubectl get service public-zookeeper-client-svc
+----
+
+Now you can simply validate that the zookeeper service is running by telnet-ing into the machine
+
+----
+telnet 123.123.123.123 2181
+----
+
+if you connected successfully, you should see the following in your terminal window
+
+----
+Escape character is '^]'.
+----
+
+type in *stats* and hit `enter` on your keyboard
+
+you should see the following results if everything is working
+
+----
+Zookeeper version: 3.6.1--104dcb3e3fb464b30c5186d229e00af9f332524b, built on 04/21/2020 15:01 GMT
+Clients:
+ /10.240.0.5:65447[0](queued=0,recved=1,sent=0)
+ /10.240.0.5:7879[1](queued=0,recved=0,sent=0)
+
+Latency min/avg/max: 0/0.0/0
+Received: 3779
+Sent: 3778
+Connections: 2
+Outstanding: 0
+Zxid: 0x100000016
+Mode: follower
+Node count: 7
+----
+
+image::global_zk.png[global_zk]
+
+== Create Pulsar Clusters
+
+=== Region One Pulsar Cluster - East US
+
+. Create the AKS cluster - East US
+
+----
+az aks create --resource-group pulsar-cluster-poc --name pulsar-cluster-poc-region-1 --node-count 9 --generate-ssh-keys --node-vm-size Standard_B4ms
+----
+
+. Create the namespace for cluster
+
+----
+kubectl create namespace pulsar-east-us
+kubectl config set-context --current --namespace=pulsar-east-us
+----
+
+. Modify the `global_zk.yaml` to point to your running zookeeper, xref:installation-geo-global-zookeeper.adoc[IF you have not yet set up global zookeeper follow the instructions here]
+
+Replace the _._._._ below to your correct cluster address
+
+----
+proxy:
+  configData:
+    configurationStoreServers: "*.*.*.*:2181"
+broker:
+  configData:
+    configurationStoreServers: "*.*.*.*:2181"
+----
+
+. Set your cluster name, take a look at `region1.yaml`
+
+----
+fullnameOverride: "pulsar-east-us"
+----
+
+. Install the helm charts
+
+----
+helm install pulsar datastax-pulsar/pulsar --namespace pulsar-east-us --values storage_values.yaml --values custom_image.yaml --values region1.yaml --values global_zk.yaml --create-namespace
+----
+
+. Validate the cluster is running
+
+----
+kubectl exec $(kubectl get pods -l component=bastion -o jsonpath="{.items[*].metadata.name}" -n pulsar-east-us) -it -n pulsar — /bin/bash
+----
+
+. Validation of your environment
+
+By now you should probably have multiple namespaces and contexts running along with multiple clusters, take a look at the screenshots below to ensure you have everything configured and running correctly
+
+image::kubectl_namespaces.png[namespaces]
+
+. Validate Global Zookeeper is used
+
+=== Region Two Pulsar Cluster - East US 2
+
+. Create the second Region
+
+----
+az group create --name pulsar-cluster-region-2 --location eastus2
+----
+
+. Create the AKS cluster - East US 2
+
+----
+az aks create --resource-group pulsar-cluster-region-2 --name pulsar-cluster-poc-region-2 --node-count 4 --generate-ssh-keys --node-vm-size Standard_B4ms
+----
+
+. Create the namespace for cluster
+
+----
+kubectl create namespace pulsar-east-us2
+kubectl config set-context --current --namespace=pulsar-east-us2
+kubectl config use-context pulsar-cluster-poc-region-2
+----
+
+. Modify the `global_zk.yaml` to point to your running zookeeper, xref:installation-geo-global-zookeeper.adoc[IF you have not yet set up global zookeeper follow the instructions here]
+
+Replace the _._._._ below to your correct cluster address
+
+----
+proxy:
+  configData:
+    configurationStoreServers: "*.*.*.*:2181"
+broker:
+  configData:
+    configurationStoreServers: "*.*.*.*:2181"
+----
+
+. Set your cluster name, take a look at `region1.yaml`
+
+----
+fullnameOverride: "pulsar-east-us2"
+----
+
+. Install the helm charts
+
+----
+helm install pulsar datastax-pulsar/pulsar --namespace pulsar-east-us2 --values storage_values.yaml --values custom_image.yaml --values region2.yaml --values global_zk.yaml --create-namespace
+----
+
+. Validate the cluster is running
+
+----
+kubectl exec $(kubectl get pods -l component=bastion -o jsonpath="{.items[*].metadata.name}" -n pulsar-east-us) -it -n pulsar — /bin/bash
+----
+
+. Validation of your environment
+
+By now you should probably have multiple namespaces and contexts running along with multiple clusters, take a look at the screenshots below to ensure you have everything configured and running correctly
+
+image::kubectl_namespaces.png[namespaces]
+
+. Validate Global Zookeeper is used
+
+You SHould see *10* nodes
+
+----
+zekedean@zdean-rmbp16 pulsar_geo_replication_aks % telnet 20.81.70.202 2181
+Trying 20.81.70.202...
+Connected to 20.81.70.202.
+Escape character is '^]'.
+stats
+Zookeeper version: 3.6.1--104dcb3e3fb464b30c5186d229e00af9f332524b, built on 04/21/2020 15:01 GMT
+Clients:
+ /10.240.0.6:41391[1](queued=0,recved=264,sent=264)
+ /10.244.0.1:6593[1](queued=0,recved=832,sent=832)
+ /10.240.0.4:53272[1](queued=0,recved=832,sent=832)
+ /10.244.0.1:48736[1](queued=0,recved=11595,sent=11595)
+ /10.244.0.1:20509[1](queued=0,recved=4576,sent=4576)
+ /10.244.0.1:61398[1](queued=0,recved=0,sent=0)
+ /10.240.0.6:46007[1](queued=0,recved=832,sent=832)
+ /10.240.0.4:26845[0](queued=0,recved=1,sent=0)
+ /10.240.0.6:5252[1](queued=0,recved=2342,sent=2342)
+ /10.240.0.6:22245[1](queued=0,recved=832,sent=832)
+ /10.240.0.4:55549[1](queued=0,recved=832,sent=832)
+ /10.240.0.6:25575[1](queued=0,recved=12351,sent=12351)
+
+Latency min/avg/max: 0/0.2613/237
+Received: 60677
+Sent: 60676
+Connections: 12
+Outstanding: 0
+Zxid: 0x100000040
+Mode: follower
+Node count: 10
+Connection closed by foreign host.
+----
+
+== Configuring the Multi-Region Clusters
+
+. Get IP address of the pulsar-proxy services for *2* clusters
+
+You have to set up the Pulsar Clusters to know about each other for directional communications
+
+First you have to get the IP address of the pulsar proxy, if you set up your context correctly, you should be able to pull the IP address with the following commands
+
+* `pulsar-east-us`
+
+----
+kubectl config use-context pulsar-cluster-poc-region-1
+kubectl get services --namespace pulsar-east-us pulsar-proxy --output jsonpath='{.status.loadBalancer.ingress[0].ip}'
+----
+
+* `pulsar-east-us2`
+
+----
+kubectl config use-context pulsar-cluster-poc-region-2
+kubectl get services --namespace pulsar-east-us2 pulsar-proxy --output jsonpath='{.status.loadBalancer.ingress[0].ip}'
+----
+
+The output to the above should give you the IP address, make note of it for later
+
+. Connect the clusters
+
+** PLEASE RUN ALL THE COMMANDS THROUGH THE BASTION HOST**
+
+image::k9s.png[k9s]
+
+* Configure the connection from `pulsar-east-us` to `pulsar-east-us2`.
++
+Run the following command on `pulsar-east-us`.
+
+[source,shell]
+----
+$ bin/pulsar-admin clusters create \
+  --broker-url pulsar://<DNS-OF-US-EAST>:<PORT>	\
+  --url http://<DNS-OF-US-EAST>:<PORT> \
+  pulsar-east-us2
+----
+
+* Configure the connection from `pulsar-east-us2` to `pulsar-east-us`.
++
+Run the following command on `pulsar-east-us2`.
+
+[source,shell]
+----
+$ bin/pulsar-admin clusters create \
+  --broker-url pulsar://<DNS-OF-US-CENT>:<PORT>	\
+  --url http://<DNS-OF-US-CENT>:<PORT> \
+  pulsar-east-us
+----
+
+. Create the namespaces
+
+To replicate to a cluster, the tenant needs permission to use that cluster.
+You can grant permission to the tenant when you create the tenant or grant later.
+
+Specify all the intended clusters when you create a tenant:
+
+[source,shell]
+----
+$ bin/pulsar-admin tenants create my-tenant \
+  --admin-roles my-admin-role \
+  --allowed-clusters pulsar-east-us,pulsar-east-us2
+----
+
+To update permissions of an existing tenant, use `update` instead of `create`.
+
+. Enable geo-replication namespaces
+
+You can create a namespace with the following command sample.
+
+[source,shell]
+----
+$ bin/pulsar-admin namespaces create my-tenant/my-namespace
+----
+
+Initially, the namespace is not assigned to any cluster.
+You can assign the namespace to clusters using the `set-clusters` subcommand:
+
+[source,shell]
+----
+$ bin/pulsar-admin namespaces set-clusters my-tenant/my-namespace \
+  --clusters pulsar-east-us,pulsar-east-us2
+----
+
+. Create a test Topic
+. Send a test message
+. Receive the test message
+
+== Troubleshooting
+
+[discrete]
+==== Make Sure Your kubectl context is absolutely 100% correct!
+
+----
+CURRENT   NAME                                  CLUSTER                               AUTHINFO                                                             NAMESPACE
+          docker-desktop                        docker-desktop                        docker-desktop
+          global-zookeeper
+          minikube                              minikube                              minikube                                                             default
+          pulsar-cluster-poc-global-zookeeper   pulsar-cluster-poc-global-zookeeper   clusterUser_pulsar-cluster-poc_pulsar-cluster-poc-global-zookeeper   global-zookeeper
+          pulsar-cluster-poc-region-1           pulsar-cluster-poc-region-1           clusterUser_pulsar-cluster-poc_pulsar-cluster-poc-region-1           pulsar-east-us
+*         pulsar-cluster-poc-region-2           pulsar-cluster-poc-region-2           clusterUser_pulsar-cluster-region-2_pulsar-cluster-poc-region-2      pulsar-east-us2
+----
+
+https://kubernetes.io/docs/reference/kubectl/cheatsheet/#kubectl-context-and-configuration[Please see this cheatsheet for all the information you need to know about switching contexts]
+
+[discrete]
+==== Deleting Volumes
+
+----
+kubectl delete persistentvolumeclaims pulsar-bookkeeper-journal-pulsar-bookkeeper-0
+kubectl delete persistentvolumeclaims pulsar-bookkeeper-journal-pulsar-bookkeeper-1
+kubectl delete persistentvolumeclaims pulsar-bookkeeper-ledgers-pulsar-bookkeeper-0
+kubectl delete persistentvolumeclaims pulsar-bookkeeper-ledgers-pulsar-bookkeeper-1
+kubectl delete persistentvolumeclaims pulsar-zookeeper-data-pulsar-zookeeper-0
+kubectl delete persistentvolumeclaims pulsar-zookeeper-data-pulsar-zookeeper-1
+kubectl delete persistentvolumeclaims pulsar-zookeeper-data-pulsar-zookeeper-2
+----

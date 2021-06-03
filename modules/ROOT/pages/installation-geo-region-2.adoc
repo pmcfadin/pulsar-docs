@@ -1,0 +1,88 @@
+= Region Two Pulsar Cluster - East US 2
+
+. Create the second Region
+
+----
+az group create --name pulsar-cluster-region-2 --location eastus2
+----
+
+. Create the AKS cluster - East US 2
+
+----
+az aks create --resource-group pulsar-cluster-region-2 --name pulsar-cluster-poc-region-2 --node-count 4 --generate-ssh-keys --node-vm-size Standard_B4ms
+----
+
+. Create the namespace for cluster
+
+----
+kubectl create namespace pulsar-east-us2
+kubectl config set-context --current --namespace=pulsar-east-us2
+kubectl config use-context pulsar-cluster-poc-region-2
+----
+
+. Modify the `global_zk.yaml` to point to your running zookeeper, xref:installation-geo-global-zookeeper.adoc[IF you have not yet set up global zookeeper follow the instructions here]
+
+Replace the _._._._ below to your correct cluster address
+
+----
+proxy:
+  configData:
+    configurationStoreServers: "*.*.*.*:2181"
+broker:
+  configData:
+    configurationStoreServers: "*.*.*.*:2181"
+----
+
+. Install the helm charts
+
+----
+helm install pulsar-east-2 datastax-pulsar/pulsar --namespace pulsar-east-us2 --values storage_values.yaml --values global_zk.yaml --create-namespace
+----
+
+. Validate the cluster is running
+
+----
+kubectl exec $(kubectl get pods -l component=bastion -o jsonpath="{.items[*].metadata.name}" -n pulsar-east-us) -it -n pulsar — /bin/bash
+----
+
+. Validation of your environment
+
+By now you should probably have multiple namespaces and contexts running along with multiple clusters, take a look at the screenshots below to ensure you have everything configured and running correctly
+
+image::kubectl_namespace.png[namespaces]
+
+. Validate Global Zookeeper is used
+
+You SHould see *10* nodes
+
+----
+zekedean@zdean-rmbp16 pulsar_geo_replication_aks % telnet 20.81.70.202 2181
+Trying 20.81.70.202...
+Connected to 20.81.70.202.
+Escape character is '^]'.
+stats
+Zookeeper version: 3.6.1--104dcb3e3fb464b30c5186d229e00af9f332524b, built on 04/21/2020 15:01 GMT
+Clients:
+ /10.240.0.6:41391[1](queued=0,recved=264,sent=264)
+ /10.244.0.1:6593[1](queued=0,recved=832,sent=832)
+ /10.240.0.4:53272[1](queued=0,recved=832,sent=832)
+ /10.244.0.1:48736[1](queued=0,recved=11595,sent=11595)
+ /10.244.0.1:20509[1](queued=0,recved=4576,sent=4576)
+ /10.244.0.1:61398[1](queued=0,recved=0,sent=0)
+ /10.240.0.6:46007[1](queued=0,recved=832,sent=832)
+ /10.240.0.4:26845[0](queued=0,recved=1,sent=0)
+ /10.240.0.6:5252[1](queued=0,recved=2342,sent=2342)
+ /10.240.0.6:22245[1](queued=0,recved=832,sent=832)
+ /10.240.0.4:55549[1](queued=0,recved=832,sent=832)
+ /10.240.0.6:25575[1](queued=0,recved=12351,sent=12351)
+
+Latency min/avg/max: 0/0.2613/237
+Received: 60677
+Sent: 60676
+Connections: 12
+Outstanding: 0
+Zxid: 0x100000040
+Mode: follower
+Node count: 10
+Connection closed by foreign host.
+----

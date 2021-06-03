@@ -1,0 +1,90 @@
+= Setting up global zookeeper
+
+== Connect to the Cluster
+
+----
+az login
+az aks get-credentials --name pulsar-cluster-poc-global-zookeeper -g pulsar-cluster-poc
+----
+
+If all goes well you should see the following
+
+** Merged "pulsar-cluster-poc-global-zookeeper" as current context in /Users/zekedean/.kube/config **
+
+== (optional) set the kubectl namespace
+
+----
+kubectl create namespace global-zookeeper
+kubectl config set-context $(kubectl config current-context) --namespace=global-zookeeper
+----
+
+== Install the Helm Charts
+
+----
+helm repo add pravega https://charts.pravega.io
+helm repo update
+----
+
+== Deploy the zookeeper operator
+
+----
+helm install zookeeper-operator pravega/zookeeper-operator
+helm install zookeeper pravega/zookeeper
+----
+
+== Expose the zookeeper serivce with this yaml file or copy and paste the below
+
+----
+apiVersion: v1
+kind: Service
+metadata:
+  name: public-zookeeper-client-svc
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 2181
+  selector:
+    app: zookeeper
+----
+
+== Test that Zookeeper is up and running
+
+Run the following command to get the external-ip address
+
+----
+kubectl get service public-zookeeper-client-svc
+----
+
+Now you can simply validate that the zookeper service is running by telnet-ing into the machine
+
+----
+telnet 123.123.123.123 2181
+----
+
+if you connected successfully, you should see the following in your terminal window
+
+----
+Escape character is '^]'.
+----
+
+type in *stats* and hit `enter` on your keyboard
+
+you should see the following results if everything is working
+
+----
+Zookeeper version: 3.6.1--104dcb3e3fb464b30c5186d229e00af9f332524b, built on 04/21/2020 15:01 GMT
+Clients:
+ /10.240.0.5:65447[0](queued=0,recved=1,sent=0)
+ /10.240.0.5:7879[1](queued=0,recved=0,sent=0)
+
+Latency min/avg/max: 0/0.0/0
+Received: 3779
+Sent: 3778
+Connections: 2
+Outstanding: 0
+Zxid: 0x100000016
+Mode: follower
+Node count: 7
+----
+
+once you have telnetted into the machine, run the
