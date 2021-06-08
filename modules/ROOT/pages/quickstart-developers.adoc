@@ -1,7 +1,4 @@
 = Quickstart for developers
-:description: Get up and coding with K8ssandra by exposing access to Stargate and CQL APIs!
-:linkTitle: Developers
-:weight: 1
 
 *Completion time*: *10 minutes*.
 

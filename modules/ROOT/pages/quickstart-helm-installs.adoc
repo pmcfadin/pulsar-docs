@@ -10,16 +10,15 @@ It is designed for production use, but can also be used in local development env
 
 The resulting configuration includes support for:
 
-* xref:quickstart-helm-installs.adoc#tls[TLS]
-* xref:quickstart-helm-installs.adoc#authentication[Authentication]
+* TLS
+* Authentication
 * WebSocket Proxy
 * Standalone Functions Workers
 * Pulsar IO Connectors
-* xref:quickstart-helm-installs.adoc#tiered-storage[Tiered Storage] including Tardigarde distributed cloud storage
-* xref:quickstart-helm-installs.adoc#pulsar-sql[Pulsar SQL Workers]
+* Tiered Storage including Tardigarde distributed cloud storage
+* Pulsar SQL Workers
 * Pulsar Admin Console for managing the cluster
 * Pulsar heartbeat
-* Burnell for API-based token generation
 * Prometheus, Grafana, and Alertmanager stack with default Grafana dashboards and Pulsar-specific alerting rules
 * cert-manager with support for self-signed certificates as well as public certificates using ACME; such as Let's Encrypt
 * Ingress for all HTTP ports (Pulsar Admin Console, Prometheus, Grafana, others)
@@ -32,38 +31,7 @@ To get started with Helm, refer to Helm https://helm.sh/docs/[documentation].
 * Helm version 3
 * A Kubernetes cluster
 
-If you haven't already, install Helm version 3, create a Kubernetes cluster, and ensure you have access to the Kubernetes cluster (such as minikube). Example:
-
-Download and install https://brew.sh/[Homebrew]:
-
-`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
-
-Follow the Homebrew instruction regarding the path, such as adding the following to your ~/.profile:
-
-----
-# set PATH so it includes user's private bin directories
-PATH="$HOME/bin:$HOME/.local/bin:$PATH"
-----
-
-Update your environment:
-
-`source ~/.profile`
-
-Use `brew` to install 'gcc` (recommended by Homebrew) and install `helm` v3:
-
-----
-brew install gcc
-brew install helm
-----
-
-Again, only if you don't already have a Kubernetes cluster, create one. For details on setting up minikube, see its https://minikube.sigs.k8s.io/docs/start/[documentation]. Here's a quick summary of the commands, which assume you already have Homebrew and https://kubernetes.io/docs/tasks/tools/install-kubectl[kubectl] installed:
-
-----
-brew install minikube
-which minikube
-minikube start
-kubectl get pods -A
-----
+If you haven't already, install Helm version 3, create a Kubernetes cluster, and ensure you have access to the Kubernetes cluster (such as Minikube).
 
 == Use Helm to add the repo and install Luna Streaming (Pulsar) on your laptop
 
@@ -521,7 +489,6 @@ such as https://cert-mananager[cert-manager]. This https://github.com/datastax/p
 Once you have created the secrets that store the certificate info (or specified it in the values), you can enable TLS in the values:
 
 `enableTls: yes`
-
 
 ## Next
 
