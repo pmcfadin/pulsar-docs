@@ -7,9 +7,6 @@
 *** xref:installation-gke.adoc[GKE]
 ** xref:quickstart-server-installs.adoc[Bare metal]
 ** xref:installation-geo-replicate.adoc[Geo replication]
-*** xref:installation-geo-global-zookeeper.adoc[Configuring a global Zookeeper]
-*** xref:installation-geo-region-1.adoc[Configure region 1]
-*** xref:installation-geo-region-2.adoc[Configure region 2]
 * Quick starts
 ** xref:quickstart-developers.adoc[Developers]
 ** xref:quickstart-site-operations.adoc[Site operations engineers]
