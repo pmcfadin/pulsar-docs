@@ -375,7 +375,6 @@ Do the following:
 == Next steps
 
 * xref:quickstart-developers.adoc[]
-* xref:quickstart-site-operations.adoc[]
 
 For configuration details specific to cloud providers, see:
 
