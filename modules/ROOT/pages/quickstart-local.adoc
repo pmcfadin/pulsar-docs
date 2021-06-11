@@ -5,17 +5,6 @@ Use this for writer comments.
 
 In this quick start, you'll get familiar with Astra Streaming by creating a tenant, as well as a topic. You'll then download and configure the Apache Pulsar command line tools and see how you can interact with your Astra Streaming topics. Finally, you'll take a look at various topic and subscription statistics available in the Astra Streaming console.
 
-== Astra Streaming free instance limits
-
-The free instance of Astra Streaming enforces the following limits:
-
-* Disk storage limit: 5 gigs
-* Maximum number of producers per topic: 5
-* Maximum number of consumers per topic: 5
-* Maximum number of consumers per subscription: 5
-* Maximum number of namespaces: 2
-* Maximum number of topics: 10
-
 [#create-a-tenant]
 == Create an Astra Streaming tenant
 
