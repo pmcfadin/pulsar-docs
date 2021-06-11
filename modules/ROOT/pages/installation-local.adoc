@@ -1,5 +1,8 @@
 = Local Luna Streaming installation
 
+[sidebar]
+Edit and keystroke and note writer comments.
+
 This topic gets you up and running with Luna Streaming on local Kubernetes (K8s) instance.
 
 If you want to install Luna Streaming on a cloud provider's Kubernetes environment, see:
@@ -8,7 +11,7 @@ If you want to install Luna Streaming on a cloud provider's Kubernetes environme
 * xref:installation-eks.adoc[]
 * xref:installation-gke.adoc[]
 
-TIP: Also available in followup topics are post-install steps and role-based considerations for xref:quickstart-developers.adoc[] or xref:quickstart-site-operations.adoc.
+TIP: Also available in followup topics are post-install steps and role-based considerations for xref:quickstart-developers.adoc[] or xref:quickstart-site-operations.adoc[].
 
 
 == Introduction
@@ -31,6 +34,9 @@ As Luna Streaming deploys on a K8s cluster, one must be available to target for 
 The K8s environment may be a local version running on your development machine, an on-premises self-hosted environment, or a managed cloud offering.
 
 Luna Streaming works with the following versions of Kubernetes either standalone or via a cloud provider:
+
+[sidebar]
+Dev please verify this.
 
 * 1.16
 * 1.17
@@ -64,6 +70,9 @@ If you don't have a K8s cluster available, you can use https://developers.redhat
 The instructions in this section focus on the Docker container solutions above, but the general instructions should work for other environments as well.
 
 === Resource recommendations for local Kubernetes installations
+
+[sidebar]
+This is for K8ssandra. Dev please verify this.
 
 We recommend a machine specification of *no less* than 16 gigs of RAM and 8 virtual processor cores (4 physical cores). You'll want to adjust your Docker resource preferences accordingly. For this quick start we're allocating 4 virtual processors and 8 gigs of RAM to the Docker environment.
 
@@ -114,6 +123,9 @@ To verify your Kubernetes environment:
 
 [#storage-classes]
 === Validate the available Kubernetes StorageClasses
+
+[sidebar]
+Dev please verify this. This is particular to K8ssandra but may be relevant for AS.
 
 Your K8s instance *must* support a storage class with a `VOLUMEBINDINGMODE` of `WaitForFirstConsumer`.
 
@@ -174,6 +186,9 @@ Luna Streaming is delivered via a collection of Helm charts for easy installatio
 
 To add the Luna Streaming helm chart repos:
 
+[sidebar]
+We need the helm repo add command. The original instructions just say "do a helm search".
+
 . Install https://helm.sh/docs/intro/install/[Helm v3+] if you haven't already.
 . Add the main Luna Streaming stable Helm chart repo:
 +
@@ -196,84 +211,47 @@ To add the Luna Streaming helm chart repos:
  helm repo update
 ----
 
-TIP: Alternatively, you can download the individual charts directly from the project's https://github.com/Luna Streaming/Luna Streaming/releases[releases] page.
+[sidebar]
+Update the github repo.
 
+TIP: Alternatively, you can download the individual charts directly from the project's https://github.com/Luna Streaming/Luna Streaming/releases[releases] page.
 
 == Install Luna Streaming
 
 The Luna Streaming helm charts make installation a snap.
 You can override chart configurations during installation as necessary if you're an advanced user, or make changes after a default installation using `helm upgrade` at a later time.
 
-Luna Streaming can install the following versions of Apache Cassandra:
+[sidebar]
+Dev please verify this.
 
-* 3.11.7
-* 3.11.8
-* 3.11.9
-* 3.11.10
-* 4.0-beta4
+Luna Streaming can install the following versions of Apache Pulsar:
+
+* 2.7.x
 
 IMPORTANT: Luna Streaming comes out of the box with a set of https://github.com/Luna Streaming/Luna Streaming/blob/main/charts/Luna Streaming/values.yaml[default values] tailored to getting up and running quickly.
 Those defaults are intended to be a great starting point for smaller-scale local development but are *not* intended for production deployments.
 
-
 To install a single node Luna Streaming cluster:
 
-. Copy the following YAML to a file named `Luna Streaming.yaml`:
+. Copy the following YAML to a file named `luna-streaming.yaml`:
 +
 [source,yaml]
 ----
- cassandra:
-   version: "3.11.10"
-   cassandraLibDirVolume:
-     storageClass: local-path
-     size: 5Gi
-   allowMultipleNodesPerWorker: true
-   heap:
-    size: 1G
-    newGenSize: 1G
-   resources:
-     requests:
-       cpu: 1000m
-       memory: 2Gi
-     limits:
-       cpu: 1000m
-       memory: 2Gi
-   datacenters:
-   - name: dc1
-     size: 1
-     racks:
-     - name: default
- kube-prometheus-stack:
-   grafana:
-     adminUser: admin
-     adminPassword: admin123
- stargate:
-   enabled: true
-   replicas: 1
-   heapMB: 256
-   cpuReqMillicores: 200
-   cpuLimMillicores: 1000
+Please include a complete and valid sample YAML file here.
 ----
 +
-That configuration file creates a Luna Streaming cluster with a datacenter, `dc1`, containing a single Cassandra node, `size: 1` version `3.11.10` with the following specifications:
+That configuration file creates a Luna Streaming cluster with the following specifications:
 
- ** 1 GB of heap
- ** 2 GB of RAM for the container
- ** 1 CPU core
- ** 5 GB of storage
- ** 1 Stargate node with
-  *** 1 CPU core
-  *** 256 MB of heap
+ ** Please update with the specifications.
 
 +
 IMPORTANT: The `storageClass:` parameter must be a storage class with a `VOLUMEBINDINGMODE` of `WaitForFirstConsumer` as described in [Validate the available Kubernetes StorageClasses]({{< relref "#storage-classes" >}}).
-
 
 . Use `helm install` to install Luna Streaming, pointing to the example configuration file using the `-f` flag:
 +
 [source,bash]
 ----
- helm install -f Luna Streaming.yaml Luna Streaming Luna Streaming/Luna Streaming
+ helm install -f luna-streaming.yaml Luna Streaming Luna-Streaming/Luna-Streaming
 ----
 +
 *Output*:
@@ -286,23 +264,6 @@ IMPORTANT: The `storageClass:` parameter must be a storage class with a `VOLUMEB
  STATUS: deployed
  REVISION: 1
 ----
-+
-TIP: In the example above, the Luna Streaming pods will have the cluster name `Luna Streaming` prefixed or appended inline.
-
-+
-NOTE: When installing Luna Streaming on newer versions of Kubernetes (v1.19+), some warnings may be visible on the command line related to deprecated API usage.
-This is currently a known issue and will not impact the provisioning of the cluster.
-
-[source,bash]
-----
-W0128 11:24:54.792095  27657 warnings.go:70]
-apiextensions.k8s.io/v1beta1 CustomResourceDefinition is
-deprecated in v1.16+, unavailable in v1.22+;
-use apiextensions.k8s.io/v1 CustomResourceDefinition
-----
-
-For more information, check out issue https://github.com/Luna Streaming/Luna Streaming/issues/267[#267].
-
 
 == Verify your Luna Streaming installation
 
@@ -318,45 +279,43 @@ kubectl get pods
 
 [source,bash]
 ----
-NAME                                                READY   STATUS      RESTARTS   AGE
-Luna Streaming-cass-operator-766849b497-klgwf            1/1     Running     0          7m33s
-Luna Streaming-dc1-default-sts-0                         2/2     Running     0          7m5s
-Luna Streaming-dc1-stargate-5c46975f66-pxl84             1/1     Running     0          7m32s
-Luna Streaming-grafana-679b4bbd74-wj769                  2/2     Running     0          7m32s
-Luna Streaming-kube-prometheus-operator-85695ffb-ft8f8   1/1     Running     0          7m32s
-Luna Streaming-reaper-655fc7dfc6-n9svw                   1/1     Running     0          4m52s
-Luna Streaming-reaper-operator-79fd5b4655-748rv          1/1     Running     0          7m33s
-Luna Streaming-reaper-schema-dxvmm                       0/1     Completed   0          5m3s
-prometheus-Luna Streaming-kube-prometheus-prometheus-0   2/2     Running     1          7m27s
+NAME                                                  READY   STATUS     RESTARTS  AGE
+prometheus-pulsar-kube-prometheus-sta-prometheus-0    2/2     Running    1         10m
+pulsar-adminconsole-9669f6d98-dxjvp                   2/2     Running    3         12m
+pulsar-autorecovery-7cf8d598d6-6fwpn                  1/1     Running    4         12m
+pulsar-bastion-67776dddc-xc6tb                        1/1     Running    0         12m
+pulsar-bookkeeper-0                                   1/1     Running    1         12m
+pulsar-broker-7d9b8974dc-hd8xz                        1/1     Running    11        12m
+pulsar-cert-manager-76c9d8d4d-szzh9                   1/1     Running    3         12m
+pulsar-cert-manager-cainjector-dbff95bff-fbsmk        1/1     Running    5         12m
+pulsar-cert-manager-webhook-8469dc9ff6-c5x29          1/1     Running    3         12m
+pulsar-function-0                                     2/2     Running    0         12m
+pulsar-grafana-6f7d749d86-bzgwb                       2/2     Running    0         12m
+pulsar-kube-prometheus-sta-operator-c68c6bf4b-xrpdl   1/1     Running    0         12m
+pulsar-kube-state-metrics-55fb767d74-ddqp4            1/1     Running    1         12m
+pulsar-prometheus-node-exporter-cst5r                 1/1     Running    3         12m
+pulsar-proxy-7685b58f69-jqpcl                         3/3     Running    4         12m
+pulsar-pulsarheartbeat-5f897b5948-m4r7s               1/1     Running    2         12m
+pulsar-zookeeper-0                                    1/1     Running    0         12m
+pulsar-zookeeper-metadata-5l58k                       0/1     Completed  0         12m
 ----
 
-The Luna Streaming pods in the example above have the identifier `Luna Streaming` either prefixed or inline, since that's the name that was specified when the cluster was created using Helm.
-If you choose a different cluster name during installation, your pod names will be different.
-
-The actual Cassandra node name from the listing above is `Luna Streaming-dc1-default-sts-0` which we'll use throughout the following sections.
+The Luna Streaming pod in the example above is `pulsar-function-0`.
 
 Verify the following:
 
-* The Luna Streaming pod running Cassandra, `Luna Streaming-dc1-default-sts-0` in the example above should show `2/2` as `Ready`.
-* The Stargate pod, `Luna Streaming-dc1-stargate-5c46975f66-pxl84` in the example above should show `1/1` as `Ready`.
-
-IMPORTANT:
-
-* The Stargate pod will not show `Ready` until at least 4 minutes have elapsed.
-* The pod `Luna Streaming-reaper-Luna Streaming-schema-xxxxx` runs once as part of a job and does not persist.
-
-
+* What do you need to verify?
 
 Once all the pods are in the `Running` or `Completed` state, you can check the health of your Luna Streaming cluster.
 There must be *no `PENDING` pods*.
 
 To check the health of your Luna Streaming cluster:
 
-. Verify the name of the Cassandra datacenter:
+. Do the following...
 +
 [source,bash]
 ----
- kubectl get cassandradatacenters
+ kubectl get ???
 ----
 +
 *Output*:
@@ -367,7 +326,7 @@ To check the health of your Luna Streaming cluster:
  dc1    51m
 ----
 
-. Confirm that the Cassandra operator for the datacenter is `Ready`:
+. Do the following:
 +
 [source,bash]
 ----
@@ -381,7 +340,7 @@ To check the health of your Luna Streaming cluster:
     Cassandra Operator Progress:  Ready
 ----
 
-. Verify the list of available services:
+. Do the following:
 +
 [source,bash]
 ----
@@ -406,57 +365,20 @@ To check the health of your Luna Streaming cluster:
  prometheus-operated                    ClusterIP   None           <none>        9090/TCP                                                47m
 ----
 +
-Verify that the following services are present:
+Do the following:
 
  ** {blank}+++<cluster-name>+++-+++<datacenter-name>+++-all-pods-service+++</datacenter-name>++++++</cluster-name>+++
  ** {blank}+++<cluster-name>+++-+++<datacenter-name>+++-dc1-service+++</datacenter-name>++++++</cluster-name>+++
  ** {blank}+++<cluster-name>+++-+++<datacenter-name>+++-stargate-service+++</datacenter-name>++++++</cluster-name>+++
  ** {blank}+++<cluster-name>+++-+++<datacenter-name>+++-seed-service+++</datacenter-name>++++++</cluster-name>+++
 
-[#superuser]
-== Retrieve Luna Streaming superuser credentials
-
-You'll need the Luna Streaming superuser name and password in order to access Cassandra utilities and do things like generate a Stargate access token.
-
-To retrieve Luna Streaming superuser credentials:
-
-. Retrieve the Luna Streaming superuser name:
-+
-[source,bash]
-----
- kubectl get secret Luna Streaming-superuser -o jsonpath="{.data.username}" | base64 --decode ; echo
-----
-+
-*Output*:
-+
-[source,bash]
-----
- Luna Streaming-superuser
-----
-
-. Retrieve the Luna Streaming superuser password:
-+
-[source,bash]
-----
- kubectl get secret Luna Streaming-superuser -o jsonpath="{.data.password}" | base64 --decode ; echo
-----
-+
-*Output*:
-+
-[source,bash]
-----
- PGo8kROUgAJOa8vhjQrE49Lgruw7s32HCPyVvcfVmmACW8oUhfoO9A
-----
-
-TIP: Save the superuser name and password for use in the [Quickstarts]({{< relref "/quickstarts" >}}), if you decide to follow those steps.
-
-
 == Next steps
 
-* If you're a developer, and you'd like to get started coding using CQL or Stargate, see the [Quickstart for developers]({{< relref "/quickstarts/developer" >}}).
-* If you're a Site Reliability Engineer, and you'd like to explore the Luna Streaming administration environment including monitoring and maintenance utilities, see the [Quickstart for Site Reliability Engineers]({{< relref "/quickstarts/site-reliability-engineer" >}}).
+* xref:quickstart-developers.adoc[]
+* xref:quickstart-site-operations.adoc[]
 
-For details that are specific to cloud providers, see:
+For configuration details specific to cloud providers, see:
 
-* Luna Streaming installs on [Google Kubernetes Engine]({{< relref "/install/gke" >}}) (GKE)
-* Luna Streaming installs on [Amazon Elastic Kubernetes Service]({{< relref "/install/eks" >}}) (EKS)
+* xref:installation-aks.adoc[]
+* xref:installation-eks.adoc[]
+* xref:installation-gke.adoc[]

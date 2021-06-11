@@ -7,9 +7,7 @@
 *** xref:installation-gke.adoc[GKE]
 ** xref:quickstart-server-installs.adoc[Bare metal]
 ** xref:installation-geo-replicate.adoc[Geo replication]
-* Quick starts
-** xref:quickstart-developers.adoc[Developers]
-** xref:quickstart-site-operations.adoc[Site operations engineers]
+* xref:quickstart-developers.adoc[Developer quick start]
 * Operations
 ** xref:ops-securing.adoc[Securing]
 ** xref:ops-troubleshooting.adoc[Troubleshooting]
