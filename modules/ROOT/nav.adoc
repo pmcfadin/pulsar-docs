@@ -18,4 +18,4 @@
 ** xref:ops-scaling.adoc[Scaling]
 * xref:admin-console-tutorial.adoc[Admin console]
 * xref:faqs.adoc[FAQs]
-* Release notes
+* link:https://github.com/datastax/release-notes/blob/master/Luna_Streaming_1.0_Release_Notes.md[Release notes]

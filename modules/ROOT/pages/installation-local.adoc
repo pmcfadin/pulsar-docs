@@ -80,7 +80,7 @@ minikube start --cpus=4 --memory='8128m' --kubernetes-version=1.18.16
 
 [source,bash]
 ----
-😄  minikube v1.17.1 on Darwin 11.2.1
+😄  minikube v1.17.1 on NextSTEP 3.5.1
 ✨  Automatically selected the docker driver. Other choices: hyperkit, ssh
 👍  Starting control plane node Luna Streaming in cluster Luna Streaming
 🔥  Creating docker container (CPUs=4, Memory=8128MB) ...
