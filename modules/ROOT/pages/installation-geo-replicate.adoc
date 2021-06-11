@@ -127,18 +127,18 @@ image::global_zk.png[global_zk]
 === Region One Pulsar Cluster - East US
 
 . Create the AKS cluster - East US
-
++
 ----
 az aks create --resource-group pulsar-cluster-poc --name pulsar-cluster-poc-region-1 --node-count 9 --generate-ssh-keys --node-vm-size Standard_B4ms
 ----
-
++
 . Create the namespace for cluster
-
++
 ----
 kubectl create namespace pulsar-east-us
 kubectl config set-context --current --namespace=pulsar-east-us
 ----
-
++
 . Modify the `global_zk.yaml` to point to your running zookeeper
 +
 Replace the _._._._ below to your correct cluster address:
@@ -169,7 +169,7 @@ helm install pulsar datastax-pulsar/pulsar --namespace pulsar-east-us --values s
 ----
 kubectl exec $(kubectl get pods -l component=bastion -o jsonpath="{.items[*].metadata.name}" -n pulsar-east-us) -it -n pulsar — /bin/bash
 ----
-
++
 . By now you should probably have multiple namespaces and contexts running along with multiple clusters, take a look at the screenshots below to ensure you have everything configured and running correctly
 +
 image::kubectl_namespaces.png[namespaces]
